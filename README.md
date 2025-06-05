@@ -9,6 +9,9 @@ A React application that displays hiking routes as a heatmap overlay on OpenHiki
 - **Interactive Map**: Zoom-dependent layer switching between heatmap and individual points
 - **Sample Data**: Includes 50 hiking routes with realistic GPS coordinates from Oregon trails
 
+![image](https://github.com/user-attachments/assets/b9f81dcf-c00d-41df-8327-9f53b1d456c6)
+
+
 ## Setup
 
 1. **Install dependencies**:
