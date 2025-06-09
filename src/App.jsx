@@ -17,11 +17,12 @@ function App() {
   const [zoomLevel, setZoomLevel] = useState(6);
   const [showZoomLevel, setShowZoomLevel] = useState(false);
   const zoomTimeoutRef = useRef(null);
-  const [colorScheme, setColorScheme] = useState('blue'); // 'blue' or 'full'
+  const [colorScheme, setColorScheme] = useState('full'); // 'blue' or 'full'
   const [randomizeIntensity, setRandomizeIntensity] = useState(false);
   const [originalHeatmapData, setOriginalHeatmapData] = useState([]);
   const [processedHeatmapData, setProcessedHeatmapData] = useState([]);
-  const [overlapRadius, setOverlapRadius] = useState(10000); // Precision multiplier for overlap detection
+  const [overlapRadius, setOverlapRadius] = useState(1000); // Precision multiplier for overlap detection
+  const [maxDensity, setMaxDensity] = useState(10); // Maximum density cap for intensity scaling
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
 
@@ -61,8 +62,8 @@ function App() {
     }, 200); // Longer delay to ensure UI is hidden
   };
 
-  // Function to reprocess original data with configurable radius
-  const reprocessWithRadius = (data, precision) => {
+  // Function to reprocess original data with configurable radius and density
+  const reprocessWithRadius = (data, precision, densityCap = maxDensity) => {
     const segmentDensity = {}; // Track how many routes use each segment
     
     // First pass: collect all line segments and count density with configurable precision
@@ -98,7 +99,7 @@ function App() {
         ...feature,
         properties: {
           ...feature.properties,
-          intensity: Math.min(density, 10), // Cap intensity at 10
+          intensity: Math.min(density, densityCap), // Cap intensity at configurable max
           density: density
         }
       };
@@ -106,7 +107,7 @@ function App() {
   };
 
   // Function to create realistic intensity patterns based on route intersections
-  const randomizeIntensities = (data, precision = overlapRadius) => {
+  const randomizeIntensities = (data, precision = overlapRadius, densityCap = maxDensity) => {
     // Group features by route for processing
     const routeGroups = {};
     data.forEach(feature => {
@@ -184,9 +185,9 @@ function App() {
         });
         
         // Add some randomness while respecting overlap patterns
-        const baseIntensity = Math.min(overlapCount, 10);
+        const baseIntensity = Math.min(overlapCount, densityCap);
         const randomVariation = Math.random() * 0.4 - 0.2; // ±20% variation
-        const intensity = Math.max(1, Math.min(10, Math.round(baseIntensity + randomVariation)));
+        const intensity = Math.max(1, Math.min(densityCap, Math.round(baseIntensity + randomVariation)));
         
         segmentIntensities[segmentKey] = intensity;
       });
@@ -222,44 +223,39 @@ function App() {
   };
 
   // Color scheme definitions
-  const getColorScheme = (scheme) => {
+  const getColorScheme = (scheme, densityCap = maxDensity) => {
+    const colors = ['interpolate', ['linear'], ['get', 'intensity']];
+    
     if (scheme === 'full') {
-      // Full spectrum heatmap colors (cool to warm)
-      return [
-        'interpolate',
-        ['linear'],
-        ['get', 'intensity'],
-        1, 'rgba(0, 120, 255, 0.4)',
-        2, 'rgba(0, 140, 255, 0.5)',
-        1, 'rgba(0, 0, 255, 0.4)',     // Blue (low intensity)
-        2, 'rgba(0, 100, 255, 0.5)',   // Light blue
-        3, 'rgba(0, 200, 255, 0.6)',   // Cyan
-        4, 'rgba(0, 255, 200, 0.7)',   // Light cyan
-        5, 'rgba(0, 255, 100, 0.8)',   // Green
-        6, 'rgba(100, 255, 0, 0.9)',   // Yellow-green
-        7, 'rgba(200, 255, 0, 1.0)',   // Yellow
-        8, 'rgba(255, 200, 0, 1.0)',   // Orange
-        9, 'rgba(255, 100, 0, 1.0)',   // Red-orange
-        10, 'rgba(255, 0, 0, 1.0)'     // Red (high intensity)
-      ];
+      // Full spectrum: blue -> cyan -> green -> yellow -> orange -> red
+      for (let i = 1; i <= densityCap; i++) {
+        const ratio = (i - 1) / Math.max(densityCap - 1, 1);
+        const opacity = Math.min(0.4 + (ratio * 0.6), 1.0);
+        
+        if (ratio <= 0.2) {
+          colors.push(i, `rgba(0, ${Math.floor(100 + ratio * 750)}, 255, ${opacity})`);
+        } else if (ratio <= 0.4) {
+          colors.push(i, `rgba(0, 255, ${Math.floor(255 - (ratio - 0.2) * 1275)}, ${opacity})`);
+        } else if (ratio <= 0.6) {
+          colors.push(i, `rgba(${Math.floor((ratio - 0.4) * 1275)}, 255, 0, ${opacity})`);
+        } else if (ratio <= 0.8) {
+          colors.push(i, `rgba(255, ${Math.floor(255 - (ratio - 0.6) * 1275)}, 0, ${opacity})`);
+        } else {
+          colors.push(i, `rgba(255, 0, 0, ${opacity})`);
+        }
+      }
     } else {
-      // Current blue gradient scheme
-      return [
-        'interpolate',
-        ['linear'],
-        ['get', 'intensity'],
-        1, 'rgba(0, 120, 255, 0.4)',
-        2, 'rgba(0, 140, 255, 0.5)',
-        3, 'rgba(0, 160, 255, 0.6)',
-        4, 'rgba(0, 180, 255, 0.7)',
-        5, 'rgba(0, 200, 255, 0.8)',
-        6, 'rgba(30, 144, 255, 0.9)',
-        7, 'rgba(0, 100, 255, 1.0)',
-        8, 'rgba(0, 80, 255, 1.0)',
-        9, 'rgba(0, 60, 220, 1.0)',
-        10, 'rgba(0, 40, 180, 1.0)'
-      ];
+      // Blue gradient
+      for (let i = 1; i <= densityCap; i++) {
+        const ratio = (i - 1) / Math.max(densityCap - 1, 1);
+        const opacity = Math.min(0.4 + (ratio * 0.6), 1.0);
+        const blueValue = Math.floor(255 - ratio * 75);
+        const greenValue = Math.floor(120 + ratio * 80);
+        colors.push(i, `rgba(0, ${greenValue}, ${blueValue}, ${opacity})`);
+      }
     }
+    
+    return colors;
   };
 
   useEffect(() => {
@@ -331,7 +327,7 @@ function App() {
           },
           paint: {
             // Color based on segment density/intensity
-            'line-color': getColorScheme(colorScheme),
+            'line-color': getColorScheme(colorScheme, maxDensity),
             // Line width increases with density and zoom
             'line-width': [
               'interpolate',
@@ -422,9 +418,9 @@ function App() {
   // Update color scheme when changed
   useEffect(() => {
     if (map.current && map.current.getLayer('hiking-heatmap-lines')) {
-      map.current.setPaintProperty('hiking-heatmap-lines', 'line-color', getColorScheme(colorScheme));
+      map.current.setPaintProperty('hiking-heatmap-lines', 'line-color', getColorScheme(colorScheme, maxDensity));
     }
-  }, [colorScheme]);
+  }, [colorScheme, maxDensity]);
 
   // Update processed data when overlap radius changes, then update map
   useEffect(() => {
@@ -435,7 +431,7 @@ function App() {
       // Use setTimeout to allow UI to update with processing state
       setTimeout(() => {
         console.log('Processing data with radius:', overlapRadius);
-        const newProcessedData = reprocessWithRadius(originalHeatmapData, overlapRadius);
+        const newProcessedData = reprocessWithRadius(originalHeatmapData, overlapRadius, maxDensity);
         setProcessedHeatmapData(newProcessedData);
         
         // Now update the map with the appropriate data
@@ -443,7 +439,7 @@ function App() {
           let dataToUse;
           if (randomizeIntensity) {
             console.log('Applying randomization...');
-            dataToUse = randomizeIntensities(newProcessedData, overlapRadius);
+            dataToUse = randomizeIntensities(newProcessedData, overlapRadius, maxDensity);
           } else {
             dataToUse = newProcessedData;
           }
@@ -458,7 +454,7 @@ function App() {
         setIsProcessing(false);
       }, 500); // Increased to 500ms to make processing indicator clearly visible
     }
-  }, [originalHeatmapData, overlapRadius, randomizeIntensity]);
+  }, [originalHeatmapData, overlapRadius, randomizeIntensity, maxDensity]);
 
 
   return (
@@ -508,7 +504,32 @@ function App() {
           
           <div>
             <label style={{ fontSize: '9px', display: 'block', marginBottom: '1px', color: '#666' }}>
-              Precision:
+              Palette Density:
+            </label>
+            <select 
+              value={maxDensity} 
+              onChange={(e) => setMaxDensity(parseInt(e.target.value))}
+              disabled={isProcessing}
+              style={{
+                fontSize: '9px',
+                padding: '1px 2px',
+                border: '1px solid #ccc',
+                borderRadius: '2px',
+                backgroundColor: isProcessing ? '#f5f5f5' : 'white',
+                opacity: isProcessing ? 0.6 : 1,
+                width: '100%'
+              }}
+            >
+              <option value={5}>5 routes</option>
+              <option value={10}>10 routes</option>
+              <option value={20}>20 routes</option>
+              <option value={50}>50 routes</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ fontSize: '9px', display: 'block', marginBottom: '1px', color: '#666' }}>
+              Overlap Radius:
             </label>
             <select 
               value={overlapRadius} 
