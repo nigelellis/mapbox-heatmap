@@ -7,7 +7,8 @@
       "Bash(npm run dev:*)",
       "WebFetch(domain:www.plotaroute.com)",
       "WebFetch(domain:www.walksinscotland.com)",
-      "WebFetch(domain:zpacks.com)"
+      "WebFetch(domain:zpacks.com)",
+      "Bash(npm run generate-heatmap:*)"
     ],
     "deny": []
   }

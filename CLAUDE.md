@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 - `npm run dev` - Start development server
-- `npm run build` - Build for production 
+- `npm run build` - Build for production (automatically runs generate-heatmap first)
+- `npm run generate-heatmap` - Pre-process GPX files into static JSON heatmap data
 - `npm run lint` - Run ESLint on JS/JSX files
 - `npm run preview` - Preview production build locally
 
@@ -36,10 +37,21 @@ This is a React + Vite application that creates an interactive heatmap visualiza
 
 ### Data Processing Flow
 
-1. **Route Loading**: GPX files are dynamically discovered using `vite-plugin-dir2json` and loaded from `/public/routes/`
-2. **Density Calculation**: Routes are broken into line segments, with density calculated based on geographic overlap using configurable precision
-3. **Heatmap Generation**: Segments are assigned intensity values (1-10) based on how many routes overlap at each location
+1. **Build-time Processing**: GPX files are processed at build time using `scripts/generateHeatmapData.js` to create `/public/heatmap-data.json`
+2. **Static Data Loading**: The application loads pre-processed heatmap data from the static JSON file at startup
+3. **Runtime Processing**: Only overlap radius and randomization settings are processed at runtime for performance
 4. **Map Rendering**: Data is rendered as Mapbox GL line layers with color/width based on intensity
+
+### Build Process
+
+The application uses a two-stage build process:
+1. **Pre-build**: `npm run generate-heatmap` processes all GPX files in `/public/routes/` and generates static heatmap data
+2. **Main build**: Standard Vite build process that includes the pre-generated JSON file
+
+The static JSON file is automatically regenerated when:
+- Running `npm run build` (via prebuild script)
+- Manually running `npm run generate-heatmap`
+- Any GPX files in `/public/routes/` are added, modified, or removed (manual regeneration required)
 
 ### Key Features
 

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { loadRoutes, convertRoutesToHeatmapData } from './routeLoader';
+import { loadStaticHeatmapData } from './staticRouteLoader';
 
 // You'll need to get a Mapbox access token from https://account.mapbox.com/
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -12,7 +12,7 @@ function App() {
   const [lng] = useState(-2.5);
   const [lat] = useState(54.5);
   const [zoom] = useState(6);
-  const [routes, setRoutes] = useState([]);
+  const [routeCount, setRouteCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(6);
   const [showZoomLevel, setShowZoomLevel] = useState(false);
@@ -292,15 +292,16 @@ function App() {
       });
 
       map.current.on('load', async () => {
-        // Load GPX routes
-        const loadedRoutes = await loadRoutes();
-        setRoutes(loadedRoutes);
-        setLoading(false);
-
-        // Parse GPX data into line segments with density calculation
-        const heatmapData = convertRoutesToHeatmapData(loadedRoutes);
-        console.log('Loaded routes:', loadedRoutes.length);
-        console.log('Heatmap features:', heatmapData.length);
+        try {
+          // Load pre-processed heatmap data
+          const heatmapDataResponse = await loadStaticHeatmapData();
+          const heatmapData = heatmapDataResponse.features;
+          
+          setRouteCount(heatmapDataResponse.metadata.totalRoutes);
+          setLoading(false);
+          
+          console.log('Loaded static heatmap data:', heatmapDataResponse.metadata.totalRoutes, 'routes');
+          console.log('Heatmap features:', heatmapData.length);
         
         // Store original data for processing
         setOriginalHeatmapData(heatmapData);
@@ -402,6 +403,10 @@ function App() {
             });
           }
         }
+        } catch (error) {
+          console.error('Error loading heatmap data:', error);
+          setLoading(false);
+        }
       });
     };
 
@@ -470,13 +475,15 @@ function App() {
           borderRadius: '4px',
           fontFamily: 'Arial, sans-serif',
           fontSize: '11px',
+          width: '120px',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
           maxWidth: '200px'
         }}>
         <h3 style={{ margin: 0, marginBottom: '4px', fontSize: '13px' }}>TGO Heatmap</h3>
         <p style={{ margin: 0, fontSize: '10px', marginBottom: '6px' }}>
           {loading ? 'Loading...' : 
            isProcessing ? 'Processing...' : 
-           `${routes.length} routes`}
+           `${routeCount} routes`}
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div>

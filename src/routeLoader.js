@@ -2,17 +2,32 @@
 import gpxParser from 'gpxparser';
 import routeFiles from "../public/routes?dir2json&ext=.gpx&lazy";
 
-export const loadRoutes = async () => {
+export const loadRoutes = async (onProgress) => {
   try {
-    const routeFilesGPX = Object.keys(routeFiles).map(k => `${k}.gpx`);    
+    const routeFilesGPX = Object.keys(routeFiles).map(k => `${k}.gpx`);
+
+    const totalFiles = routeFilesGPX.length;
+    let completedFiles = 0;
+    
     const routePromises = routeFilesGPX.map(async (filename) => {
       const response = await fetch(`/routes/${filename}`);
       if (!response.ok) {
         console.warn(`Failed to load route: ${filename}`);
+        completedFiles++;
+        if (onProgress) {
+          onProgress(completedFiles, totalFiles, `Loading ${filename}`);
+        }
         return null;
       }
       const gpxText = await response.text();
-      return parseGPX(gpxText, filename);
+      const result = parseGPX(gpxText, filename);
+      
+      completedFiles++;
+      if (onProgress) {
+        onProgress(completedFiles, totalFiles, `Loaded ${filename}`);
+      }
+      
+      return result;
     });
 
     const routes = await Promise.all(routePromises);
@@ -41,11 +56,25 @@ const parseGPX = (gpxText, filename) => {
   }
 };
 
-export const convertRoutesToHeatmapData = (routes) => {
+export const convertRoutesToHeatmapData = (routes, onProgress) => {
   const features = [];
   const segmentDensity = {}; // Track how many routes use each segment
   
+  // Count total segments for progress tracking
+  let totalSegments = 0;
+  routes.forEach((route) => {
+    if (route?.tracks) {
+      route.tracks.forEach((track) => {
+        totalSegments += Math.max(0, track.points.length - 1);
+      });
+    }
+  });
+  
+  let processedSegments = 0;
+  
   // First pass: collect all line segments and count density
+  if (onProgress) onProgress(0, totalSegments, 'Analyzing route segments...');
+  
   routes.forEach((route, routeIndex) => {
     if (route?.tracks) {
       route.tracks.forEach((track) => {
@@ -64,10 +93,18 @@ export const convertRoutesToHeatmapData = (routes) => {
             : `${lat2},${lon2}-${lat1},${lon1}`;
           
           segmentDensity[key] = (segmentDensity[key] || 0) + 1;
+          
+          processedSegments++;
+          if (onProgress && processedSegments % 100 === 0) {
+            onProgress(processedSegments, totalSegments, 'Analyzing route segments...');
+          }
         }
       });
     }
   });
+  
+  processedSegments = 0;
+  if (onProgress) onProgress(0, totalSegments, 'Creating heatmap features...');
   
   // Second pass: create line features with density-based intensity
   routes.forEach((route, routeIndex) => {
@@ -106,10 +143,17 @@ export const convertRoutesToHeatmapData = (routes) => {
               coordinates: [[point1.lon, point1.lat], [point2.lon, point2.lat]]
             }
           });
+          
+          processedSegments++;
+          if (onProgress && processedSegments % 100 === 0) {
+            onProgress(processedSegments, totalSegments, 'Creating heatmap features...');
+          }
         }
       });
     }
   });
+  
+  if (onProgress) onProgress(totalSegments, totalSegments, 'Heatmap calculation complete');
   
   return features;
 };
