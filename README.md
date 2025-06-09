@@ -2,15 +2,8 @@
 
 A React application that displays hiking routes as a heatmap overlay on OpenHikingMap using Mapbox GL JS.
 
-## Features
 
-- **OpenHikingMap Integration**: Uses the OpenHikingMap tile layer for detailed hiking trail information
-- **Route Heatmap**: Visualizes ~50 sample hiking routes from Oregon as a density heatmap
-- **Interactive Map**: Zoom-dependent layer switching between heatmap and individual points
-- **Sample Data**: Includes 50 hiking routes with realistic GPS coordinates from Oregon trails
-
-![image](https://github.com/user-attachments/assets/b9f81dcf-c00d-41df-8327-9f53b1d456c6)
-
+![image](https://github.com/user-attachments/assets/78626f08-5296-4424-96b2-41c2023b9dce)
 
 ## Setup
 
